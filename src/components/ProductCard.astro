@@ -1,0 +1,111 @@
+---
+export interface Product {
+    _id: string;
+    title: string;
+    slug: string;
+    price: number;
+    mrp: number | null;
+    imageUrl: string;
+    categorySlug: string; // Used for example links
+    quantity?: number; // Optional for cart view
+}
+
+export interface Props {
+    product: Product;
+}
+
+const { product } = Astro.props;
+const discount = product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : null;
+---
+
+<article class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden group border border-gray-100">
+    <a href={`/products/${product.slug}`} class="relative block overflow-hidden">
+        <div class="h-64">
+            <img
+                src={product.imageUrl}
+                alt={product.title}
+                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                loading="lazy"
+            />
+        </div>
+        {discount && (
+            <span class="absolute top-2 left-2 px-3 py-1 bg-[rgb(var(--color-secondary))] text-white text-xs font-bold rounded-full shadow-md">
+                {discount}% OFF
+            </span>
+        )}
+    </a>
+    <div class="p-4">
+        <p class="text-sm text-gray-500 mb-1 capitalize">{product.categorySlug.replace('-', ' ')}</p>
+        <h3 class="text-lg font-semibold text-gray-800 line-clamp-2">
+            <a href={`/products/${product.slug}`} class="hover:text-[rgb(var(--color-primary))] transition-colors">
+                {product.title}
+            </a>
+        </h3>
+
+        <div class="flex items-end justify-between mt-3">
+            <div class="flex flex-col">
+                <p class="text-2xl font-bold text-[rgb(var(--color-primary))]">
+                    ${product.price.toFixed(2)}
+                </p>
+                {product.mrp && (
+                    <p class="text-sm text-gray-400 line-through">
+                        ${product.mrp.toFixed(2)}
+                    </p>
+                )}
+            </div>
+            <button
+                data-product-id={product._id}
+                data-product-title={product.title}
+                data-product-price={product.price}
+                data-product-image={product.imageUrl}
+                class="add-to-cart-btn p-2 rounded-full bg-[rgb(var(--color-primary))] text-white hover:bg-purple-700 transition-colors duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+                aria-label="Add to cart"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.435a1 1 0 00.95.69h10.422a2 2 0 001.995-1.858L21 8H4.477L4.1 6H2a1 1 0 000 2h.25l1.64 8.2a1 1 0 00.95.8h13.79a1 1 0 00.966-1.242l-1.5-6a1 1 0 00-.966-.758H6.555L5.75 3.14A2 2 0 003.882 1H3zM7 18a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+            </button>
+        </div>
+        
+    </div>
+</article>
+
+<script is:inline>
+  // Add to Cart Logic
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+        button.addEventListener('click', (event) => {
+            const btn = event.currentTarget;
+            const productId = btn.dataset.productId;
+            const title = btn.dataset.productTitle;
+            const price = parseFloat(btn.dataset.productPrice);
+            const imageUrl = btn.dataset.productImage;
+            
+            let cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+            const existingItemIndex = cart.findIndex(item => item._id === productId);
+
+            if (existingItemIndex > -1) {
+                // Item exists, increment quantity
+                cart[existingItemIndex].quantity += 1;
+            } else {
+                // Item is new
+                cart.push({
+                    _id: productId,
+                    title: title,
+                    price: price,
+                    imageUrl: imageUrl,
+                    quantity: 1,
+                });
+            }
+
+            sessionStorage.setItem('cart', JSON.stringify(cart));
+            
+            // Notify the user
+            alert(`Added ${title} to cart!`);
+
+            // Dispatch a custom event to update the cart count in the navigation
+            window.dispatchEvent(new Event('cartUpdated'));
+        });
+    });
+  });
+</script>

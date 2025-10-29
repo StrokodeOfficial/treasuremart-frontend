@@ -55,6 +55,7 @@ const seo = {
 	...seoProp,
 };
 
+const { title, description, cartCount } = Astro.props;
 ---
 
 <html lang=en>
@@ -63,7 +64,7 @@ const seo = {
 		<AstroSeo {...seo} />
 	</head>
 	<body class="bg-slate-50">
-		<Navigation />
+		<Navigation cartCount={cartCount ?? 0} />
 		<slot />
 		<Footer />
 	</body>

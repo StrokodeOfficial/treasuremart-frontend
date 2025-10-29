@@ -1,0 +1,138 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import type { Product } from '@components/ProductCard.astro'; // Use same type for cart items
+
+const title = "Shopping Cart";
+const description = "Review your items before checkout.";
+---
+
+<BaseLayout>
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-semibold text-gray-900 mb-8 px-4">Cart 🛒</h1>
+    
+    <div id="cart-content-container">
+      <p id="empty-cart-message" class="hidden text-center text-xl text-orange-700 bg-purple-100 mb-32 py-8 px-12 border-dotted border- rounded-lg border-gray-600 border-2 m-4">
+        Your cart is empty. Time to find something awesome!
+      </p>
+
+      <div id="cart-items-list" class="space-y-6">
+        </div>
+      
+      <div id="cart-summary" class="mt-8 pt-6 border-t border-gray-200 hidden">
+        <div class="flex justify-between items-center text-xl font-semibold text-gray-800 mb-4">
+          <span>Subtotal:</span>
+          <span id="cart-total-price" class="text-[rgb(var(--color-primary))]">$0.00</span>
+        </div>
+        
+        <a href="/checkout" id="checkout-link" class="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-[rgb(var(--color-secondary))] hover:bg-orange-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+          Proceed to Checkout →
+        </a>
+      </div>
+    </div>
+    
+  </div>
+</BaseLayout>
+
+<script is:inline>
+    const listEl = document.getElementById('cart-items-list');
+    const summaryEl = document.getElementById('cart-summary');
+    const totalEl = document.getElementById('cart-total-price');
+    const emptyMsgEl = document.getElementById('empty-cart-message');
+
+    const updateCartInStorage = (newCart) => {
+        sessionStorage.setItem('cart', JSON.stringify(newCart));
+        window.dispatchEvent(new Event('cartUpdated')); // Update nav count
+        renderCart(); // Re-render the cart
+    }
+
+    const removeItem = (productId) => {
+        let cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+        const newCart = cart.filter(item => item._id !== productId);
+        updateCartInStorage(newCart);
+    }
+
+    const changeQuantity = (productId, delta) => {
+        let cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+        const itemIndex = cart.findIndex(item => item._id === productId);
+
+        if (itemIndex > -1) {
+            cart[itemIndex].quantity += delta;
+            if (cart[itemIndex].quantity <= 0) {
+                // If quantity drops to 0 or below, remove the item
+                cart.splice(itemIndex, 1);
+            }
+            updateCartInStorage(cart);
+        }
+    }
+
+    const renderCartItem = (item) => {
+        const itemTotal = item.price * item.quantity;
+        return `
+            <div class="flex items-center bg-white p-4 rounded-xl shadow-md border border-gray-100">
+                <a href="/products/${item.slug || '#'}" class="flex-shrink-0">
+                    <img src="${item.imageUrl || 'https://picsum.photos/80'}" alt="${item.title}" class="w-20 h-20 object-cover rounded-lg" />
+                </a>
+
+                <div class="flex-grow ml-4">
+                    <h3 class="text-lg font-semibold text-gray-800">
+                        <a href="/products/${item.slug || '#'}" class="hover:text-[rgb(var(--color-primary))] transition-colors">${item.title}</a>
+                    </h3>
+                    <p class="text-sm text-gray-500 mt-1">Price: $${item.price.toFixed(2)}</p>
+                </div>
+
+                <div class="flex items-center space-x-2 border border-gray-300 rounded-md p-1 mx-4">
+                    <button class="quantity-btn text-gray-600 hover:text-red-500 transition-colors" data-id="${item._id}" data-delta="-1" aria-label="Decrease quantity">-</button>
+                    <span class="w-6 text-center font-medium">${item.quantity}</span>
+                    <button class="quantity-btn text-gray-600 hover:text-green-500 transition-colors" data-id="${item._id}" data-delta="1" aria-label="Increase quantity">+</button>
+                </div>
+
+                <div class="w-24 text-right">
+                    <p class="text-lg font-bold text-gray-700">$${itemTotal.toFixed(2)}</p>
+                </div>
+                
+                <button class="remove-item-btn ml-4 text-gray-400 hover:text-red-500 transition-colors" data-id="${item._id}" aria-label="Remove item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        `;
+    }
+
+    const renderCart = () => {
+        let cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+        console.log(cart)
+        listEl.innerHTML = '';
+        let total = 0;
+
+        if (cart.length === 0) {
+            emptyMsgEl.classList.remove('hidden');
+            summaryEl.classList.add('hidden');
+            console.log('running')
+            return;
+        }
+
+        emptyMsgEl.classList.add('hidden');
+        summaryEl.classList.remove('hidden');
+        
+        cart.forEach(item => {
+            listEl.innerHTML += renderCartItem(item);
+            total += item.price * item.quantity;
+        });
+
+        totalEl.textContent = `$${total.toFixed(2)}`;
+
+        // Attach event listeners after rendering
+        document.querySelectorAll('.remove-item-btn').forEach(btn => {
+            btn.addEventListener('click', () => removeItem(btn.dataset.id));
+        });
+
+        document.querySelectorAll('.quantity-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const delta = parseInt(btn.dataset.delta);
+                changeQuantity(btn.dataset.id, delta);
+            });
+        });
+    }
+
+    // Initial render
+    renderCart();
+</script>

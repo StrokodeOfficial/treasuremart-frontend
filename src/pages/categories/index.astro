@@ -1,0 +1,19 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { fetchCategories } from '../../lib/sanity';
+const categories = await fetchCategories();
+---
+<BaseLayout>
+  <div class="card">
+    <h2 class="text-xl font-semibold mb-4">Categories</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {categories.map(c => (
+        <a class="block p-4 rounded-xl bg-white/3 hover:scale-[1.01] transition" href={`/categories/${c.slug.current}`}>
+          {c.cover ? <img class="w-full h-44 object-cover rounded-md mb-3" src={c.cover.asset.url} alt={c.title}/> : null}
+          <div class="font-semibold">{c.title}</div>
+          <div class="text-xs text-slate-400">{c.description}</div>
+        </a>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

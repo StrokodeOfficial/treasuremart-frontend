@@ -9,11 +9,19 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.13",
-    "astro": "^5.14.1",
-    "tailwindcss": "^4.1.13"
+    "@sanity/client": "^7.12.0",
+    "@tailwindcss/vite": "^4.1.16",
+    "astro": "^5.15.1",
+    "flowbite": "^3.1.2",
+    "tailwindcss": "^4.1.16"
   },
   "devDependencies": {
-    "@astrolib/seo": "1.0.0-beta.8"
+    "@astrojs/netlify": "^6.6.0",
+    "@astrolib/seo": "1.0.0-beta.8",
+    "@iconify-json/iconoir": "^1.2.9",
+    "@sanity/image-url": "^1.2.0",
+    "astro-icon": "^1.1.5",
+    "autoprefixer": "^10.4.21",
+    "prettier": "^3.6.2"
   }
 }

@@ -1,0 +1,146 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+
+const title = "Checkout";
+const description = "Complete your order with contact information.";
+---
+
+<BaseLayout>
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-4xl font-extrabold text-gray-900 mb-8 text-center">Finalize Your Order</h1>
+    
+    <div id="checkout-form-container" class="bg-white p-8 rounded-xl shadow-2xl border border-gray-100">
+        <p id="checkout-error-message" class="text-red-600 font-medium mb-4 hidden"></p>
+        
+        <form id="order-form" class="space-y-6">
+            <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2 mb-4">Contact & Shipping Details</h2>
+            
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                <input type="text" id="name" name="name" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[rgb(var(--color-primary))] focus:border-[rgb(var(--color-primary))]" placeholder="John Doe" />
+            </div>
+
+            <div>
+                <label for="phone" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                <input type="tel" id="phone" name="phone" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[rgb(var(--color-primary))] focus:border-[rgb(var(--color-primary))]" placeholder="+1 555 123 4567" />
+            </div>
+            
+            <div>
+                <label for="address" class="block text-sm font-medium text-gray-700">Shipping Address</label>
+                <textarea id="address" name="address" rows="3" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[rgb(var(--color-primary))] focus:border-[rgb(var(--color-primary))]" placeholder="Street, City, Postcode"></textarea>
+            </div>
+
+            <div class="pt-4">
+                <p class="text-base text-gray-700 italic border-t pt-4">
+                    <strong class="text-red-500">Note:</strong> Payment will be handled manually upon confirmation. You will not be charged now.
+                </p>
+            </div>
+
+            <button type="submit" id="place-order-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-medium text-white bg-[rgb(var(--color-primary))] hover:bg-purple-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50" disabled>
+                Place Order (COD)
+            </button>
+        </form>
+    </div>
+
+    <div class="mt-8 p-6 bg-purple-50 rounded-xl border border-purple-200">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Order Summary</h2>
+        <div class="flex justify-between font-medium text-gray-600">
+            <span>Items:</span>
+            <span id="summary-item-count">0</span>
+        </div>
+        <div class="flex justify-between font-bold text-lg mt-2 pt-2 border-t border-purple-300">
+            <span>Total:</span>
+            <span id="summary-total-price" class="text-2xl text-[rgb(var(--color-primary))]">$0.00</span>
+        </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline>
+  document.addEventListener('astro:page-load', () => {
+    const form = document.getElementById('order-form');
+    const placeOrderBtn = document.getElementById('place-order-btn');
+    const errorMsgEl = document.getElementById('checkout-error-message');
+    const summaryItemCountEl = document.getElementById('summary-item-count');
+    const summaryTotalPriceEl = document.getElementById('summary-total-price');
+
+    const cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+    
+    // --- Initial State Check and Summary ---
+    let totalItems = 0;
+    let totalPrice = 0;
+    if (cart.length > 0) {
+        placeOrderBtn.disabled = false;
+        cart.forEach(item => {
+            totalItems += item.quantity;
+            totalPrice += item.price * item.quantity;
+        });
+    } else {
+        placeOrderBtn.textContent = 'Cart is Empty';
+        errorMsgEl.textContent = 'Your cart is empty. Please add items before checking out.';
+        errorMsgEl.classList.remove('hidden');
+        return; // Stop execution if cart is empty
+    }
+
+    summaryItemCountEl.textContent = totalItems;
+    summaryTotalPriceEl.textContent = `$${totalPrice.toFixed(2)}`;
+    // --- End Initial State Check ---
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        placeOrderBtn.disabled = true;
+        placeOrderBtn.textContent = 'Processing...';
+        errorMsgEl.classList.add('hidden');
+
+        const formData = new FormData(form);
+        const orderDetails = {
+            name: formData.get('name'),
+            phone: formData.get('phone'),
+            address: formData.get('address'),
+            items: cart,
+            total: totalPrice.toFixed(2),
+        };
+
+        // 1. Prepare Telegram Message
+        let message = `🚨 NEW ORDER RECEIVED 🚨\n`;
+        message += `👤 Customer: ${orderDetails.name}\n`;
+        message += `📞 Phone: ${orderDetails.phone}\n`;
+        message += `📍 Address: ${orderDetails.address}\n\n`;
+        message += `💵 TOTAL: $${orderDetails.total}\n\n`;
+        message += `🛒 Items (${orderDetails.items.length}):\n`;
+        orderDetails.items.forEach((item, index) => {
+            message += `${index + 1}. ${item.title} (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}\n`;
+        });
+
+        // 2. Send to Telegram (Placeholder for your API endpoint)
+        // **YOU MUST REPLACE THIS URL WITH YOUR ACTUAL API ENDPOINT**
+        // A simple Astro API endpoint could be: POST /api/notify-telegram
+        const TELEGRAM_API_URL = '/api/place-order'; // A good place to handle this on the server side
+
+        try {
+            const response = await fetch(TELEGRAM_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, order: orderDetails }),
+            });
+
+            if (response.ok) {
+                // 3. Clear the cart and redirect
+                sessionStorage.removeItem('cart');
+                window.dispatchEvent(new Event('cartUpdated'));
+                window.location.href = '/thank-you';
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to place order. Please try again.');
+            }
+        } catch (error) {
+            console.error('Order Submission Error:', error);
+            errorMsgEl.textContent = error.message || 'An unexpected error occurred. Check console.';
+            errorMsgEl.classList.remove('hidden');
+            placeOrderBtn.disabled = false;
+            placeOrderBtn.textContent = 'Place Order (COD)';
+            alert('Order failed to send notification. Please try again.');
+        }
+    });
+  });
+</script>

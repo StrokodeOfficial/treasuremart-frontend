@@ -1,9 +1,129 @@
 ---
-import BaseLayout from "@/layouts/BaseLayout.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { fetchCategories, fetchProducts, urlFor } from "../lib/sanity";
+
+const categories = await fetchCategories();
+const productSamples: any = [];
+
+for (const cat of categories) {
+  const prods = await fetchProducts(`&& references("${cat._id}")`);
+  productSamples.push({ category: cat, samples: prods.slice(0, 6) });
+}
 ---
 
 <BaseLayout>
-	<section class="h-screen flex bg-purple-950 text-center">
-		<p class="m-auto text-3xl text-white">Hero Section</p>
-	</section>
+  <section class="px-4 py-6 space-y-10">
+    <div class="bg-orange-300 p-12 rounded-lg">
+      <h1 class="text-white">Welcome</h1>
+    </div>
+    <section class="flex-1">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-extrabold ml-2">Categories</h2>
+        <a
+          href="/categories"
+          class="text-sm text-purple-500 mr-2 font-semibold hover:underline"
+          >See all →</a
+        >
+      </div>
+      <!-- Categories Section -->
+
+      <div class="grid grid-cols-3 lg:grid-cols-3 gap-4">
+        {
+          categories.map((cat) => (
+            <a
+              href={`/categories/${cat.slug.current}`}
+              class="group bg-white/5 dark:bg-white/10 p-2 rounded-xl flex flex-col items-center text-center hover:scale-[1.03] transition"
+            >
+              {cat.cover ? (
+                <img
+                  src={urlFor(cat.cover).auto("format").url()}
+                  alt={cat.title}
+                  class="w-500 h-30 lg:h-60 object-cover rounded-md mb-2"
+                />
+              ) : (
+                <div class="w-20 h-20 bg-linear-to-br from-slate-700 to-slate-900 rounded-md mb-2" />
+              )}
+              <div class="text-sm font-bold line-clamp-1">{cat.title}</div>
+            </a>
+          ))
+        }
+      </div>
+
+      <!-- Product Samples (Horizontal Scroll) -->
+      {
+        productSamples.map((ps) => (
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">{ps.category.title}</h2>
+              <a
+                href={`/categories/${ps.category.slug.current}`}
+                class="text-sm text-indigo-400 hover:underline"
+              >
+                View all →
+              </a>
+            </div>
+
+            <div class="flex gap-4 overflow-x-auto pb-3 scrollbar-hide snap-x snap-mandatory">
+              {ps.samples.map((p) => (
+                <div class="min-w-[150px] max-w-[150px] shrink-0 bg-white/5 dark:bg-white/10 rounded-xl p-2 snap-center hover:scale-[1.02] transition">
+                  <img
+                    src={urlFor(p.images[0]).auto("format").url()}
+                    alt={p.title}
+                    class="w-full h-24 object-cover rounded-md mb-2"
+                  />
+                  <div class="text-sm font-medium truncate">{p.title}</div>
+                  <div class="text-xs text-slate-400 mb-2">₹{p.price}</div>
+                  <button
+                    onClick={`addToCart(${JSON.stringify({ id: p._id, title: p.title, price: p.price })})`}
+                    class="w-full text-xs py-1 bg-indigo-600 hover:bg-indigo-700 rounded-md text-white"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </section>
+
+    <script>
+      window.addToCart = function (item) {
+        const cart = JSON.parse(sessionStorage.getItem("cart") || "[]");
+        const found = cart.find((i) => i.id === item.id);
+        if (found) {
+          found.qty += 1;
+        } else {
+          cart.push({ ...item, qty: 1 });
+        }
+        sessionStorage.setItem("cart", JSON.stringify(cart));
+        showToast("Added to cart");
+        window.dispatchEvent(new Event("storage"));
+      };
+
+      function showToast(text) {
+        let el = document.getElementById("toast");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "toast";
+          el.className =
+            "fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-4 py-2 rounded-lg shadow-md text-sm z-50";
+          document.body.appendChild(el);
+        }
+        el.textContent = text;
+        clearTimeout(el._timeout);
+        el._timeout = setTimeout(() => el.remove(), 2200);
+      }
+    </script>
+
+    <style>
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </section>
 </BaseLayout>
