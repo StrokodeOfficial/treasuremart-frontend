@@ -3,69 +3,67 @@ import { AstroSeo, type AstroSeoProps } from "@astrolib/seo";
 import BaseHead from "@components/BaseHead.astro";
 import Footer from "@components/global/Footer.astro";
 import Navigation from "@components/global/Navigation.astro";
+import "../styles/global.css";
 
 type Props = {
-	seo?: AstroSeoProps;
+  seo?: AstroSeoProps;
 };
 
 const { seo: seoProp } = Astro.props;
-
 
 // const shareImage = new URL("", Astro.site).toString();
 const shareImage = "";
 
 const defaultSeo: AstroSeoProps = {
-	title: "Treasure Mart | Online shop",
-	description:
-		"",
-	canonical: "https://treasuremartonline.com",
-	openGraph: {
-		url: "https://treasuremartonline.com",
-		title: "Treasure Mart | Online Shop",
-		description:
-			"",
-		images: [
-			{
-				url: shareImage,
-				width: 1200,
-				height: 630,
-				alt: "Social open graph",
-				type: "image/gif",
-			},
-			{
-				url: shareImage,
-				width: 4096,
-				height: 4096,
-				alt: "Twitter open graph",
-				type: "image/gif",
-			},
-		],
-		site_name: "Treasure Mart",
-	},
-	additionalMetaTags: [
-		{
-			name: "publisher",
-			content: "Treasure Mart",
-		},
-	],
+  title: "Treasure Mart | Online shop",
+  description: "",
+  canonical: "https://treasuremartonline.com",
+  openGraph: {
+    url: "https://treasuremartonline.com",
+    title: "Treasure Mart | Online Shop",
+    description: "",
+    images: [
+      {
+        url: shareImage,
+        width: 1200,
+        height: 630,
+        alt: "Social open graph",
+        type: "image/gif",
+      },
+      {
+        url: shareImage,
+        width: 4096,
+        height: 4096,
+        alt: "Twitter open graph",
+        type: "image/gif",
+      },
+    ],
+    site_name: "Treasure Mart",
+  },
+  additionalMetaTags: [
+    {
+      name: "publisher",
+      content: "Treasure Mart",
+    },
+  ],
 };
 
 const seo = {
-	...defaultSeo,
-	...seoProp,
+  ...defaultSeo,
+  ...seoProp,
 };
 
 const { title, description, cartCount } = Astro.props;
 ---
 
-<html lang=en>
-	<head>
-		<BaseHead />
-		<AstroSeo {...seo} />
-	</head>
-	<body class="bg-slate-50">
-		<Navigation cartCount={cartCount ?? 0} />
-		<slot />
-		<Footer />
-	</body>
+<html lang="en">
+  <head>
+    <BaseHead />
+    <AstroSeo {...seo} />
+  </head>
+  <body class="bg-slate-50">
+    <Navigation cartCount={cartCount ?? 0} />
+    <slot />
+    <Footer />
+  </body>
 </html>
