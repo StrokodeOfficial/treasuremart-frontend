@@ -1,4 +1,115 @@
-<section class="p-12 m-12 bg-lime-200 rounded-lg text-center text-3xl max-h-screen">
-    <p>Work in Progress</p>
-    <p>Go back to <a href="/" class="text-blue-500 underline">home</a></p>
-</section>
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import ProductCard from '@components/ProductCard.astro';
+// --- PLACEHOLDER DATA (Replace with your Sanity data fetching logic) ---
+export const getStaticPaths = () => {
+    // In a real app, this would query Sanity for all product slugs
+    const products = [
+        { _id: 'p1', title: 'Wireless Headphones', slug: 'wireless-headphones', price: 99.99, mrp: 149.99, imageUrl: 'https://picsum.photos/id/250/600/800', categorySlug: 'electronics', description: 'Experience crystal-clear sound and supreme comfort with these over-ear wireless headphones. Featuring long-lasting battery life and noise cancellation.', images: ['https://picsum.photos/id/250/600/800', 'https://picsum.photos/id/250/600/801', 'https://picsum.photos/id/250/600/802'] },
+    ];
+    return products.map(product => ({
+        params: { slug: product.slug },
+        props: { product },
+    }));
+};
+
+const { product } = Astro.props;
+const discount = product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : null;
+---
+
+<BaseLayout>
+  <article class="grid grid-cols-1 lg:grid-cols-2 gap-12 bg-white p-8 rounded-xl shadow-2xl">
+    
+    <div class="space-y-4">
+        <img src={product.images[0]} alt={product.title} class="w-full h-auto object-cover rounded-lg shadow-xl" />
+        <div class="flex space-x-2 overflow-x-auto">
+            {product.images.map(img => (
+                <img src={img} alt={`${product.title} view`} class="w-20 h-20 object-cover rounded-md cursor-pointer border-2 border-transparent hover:border-[rgb(var(--color-primary))] transition-colors" />
+            ))}
+        </div>
+    </div>
+
+    <div>
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-2">{product.title}</h1>
+        <p class="text-lg text-gray-500 mb-6 capitalize">{product.categorySlug.replace('-', ' ')}</p>
+
+        <div class="flex items-baseline mb-6 space-x-4">
+            <p class="text-5xl font-bold text-[rgb(var(--color-primary))]">
+                ${product.price.toFixed(2)}
+            </p>
+            {product.mrp && (
+                <p class="text-xl text-gray-400 line-through">
+                    ${product.mrp.toFixed(2)}
+                </p>
+            )}
+             {discount && (
+                <span class="px-3 py-1 bg-[rgb(var(--color-secondary))] text-white text-sm font-bold rounded-full shadow-md">
+                    Save {discount}%
+                </span>
+            )}
+        </div>
+
+        <div class="prose max-w-none text-gray-600 mb-8">
+            <h2 class="text-2xl font-semibold mt-6 mb-3 text-gray-800">Product Description</h2>
+            <p>{product.description}</p>
+            </div>
+
+        <div class="flex items-center space-x-4">
+            <button
+                data-product-id={product._id}
+                data-product-title={product.title}
+                data-product-price={product.price}
+                data-product-image={product.images[0]}
+                class="add-to-cart-btn flex-grow py-3 px-6 border border-transparent text-lg font-medium rounded-lg shadow-lg text-white bg-[rgb(var(--color-primary))] hover:bg-purple-700 transition duration-300 transform hover:scale-[1.01]"
+            >
+                Add to Cart
+            </button>
+            <a href="/cart" class="py-3 px-6 border border-gray-300 text-lg font-medium rounded-lg shadow-md text-gray-700 bg-white hover:bg-gray-50 transition duration-300">
+                View Cart
+            </a>
+        </div>
+    </div>
+  </article>
+
+  <section class="mt-12">
+    <h2 class="text-3xl font-bold text-gray-900 mb-6">You might also like...</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <ProductCard product={{ _id: 'r1', title: 'Related Item 1', slug: 'related-1', price: 15.00, mrp: null, imageUrl: 'https://picsum.photos/id/1/300/400', categorySlug: 'related' }} />
+        <ProductCard product={{ _id: 'r2', title: 'Related Item 2', slug: 'related-2', price: 55.00, mrp: 65.00, imageUrl: 'https://picsum.photos/id/5/300/400', categorySlug: 'related' }} />
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  // Script copy-pasted from ProductCard to ensure the button works here
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+        button.addEventListener('click', (event) => {
+            const btn = event.currentTarget;
+            const productId = btn.dataset.productId;
+            const title = btn.dataset.productTitle;
+            const price = parseFloat(btn.dataset.productPrice);
+            const imageUrl = btn.dataset.productImage;
+            
+            let cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+            const existingItemIndex = cart.findIndex(item => item._id === productId);
+
+            if (existingItemIndex > -1) {
+                cart[existingItemIndex].quantity += 1;
+            } else {
+                cart.push({
+                    _id: productId,
+                    title: title,
+                    price: price,
+                    imageUrl: imageUrl,
+                    quantity: 1,
+                });
+            }
+
+            sessionStorage.setItem('cart', JSON.stringify(cart));
+            alert(`Added ${title} to cart!`);
+            window.dispatchEvent(new Event('cartUpdated'));
+        });
+    });
+  });
+</script>
