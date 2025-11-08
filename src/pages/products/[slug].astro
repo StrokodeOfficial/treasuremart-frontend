@@ -5,64 +5,141 @@ import BaseLayout from '@layouts/BaseLayout.astro';
 import ProductCard from '@components/ProductCard.astro';
 import { fetchProducts, urlFor } from '../../lib/sanity';
 
+// Small helper to parse cookie header to detect a minimal user object (non-blocking)
+function getUserFromCookies(cookieHeader) {
+    if (!cookieHeader) return null;
+    try {
+        const cookies = Object.fromEntries(cookieHeader.split(';').map(s => s.split('=').map(p => p && p.trim())));
+        // Example: if you store 'user' cookie as JSON base64 or id, adapt here. For now, return a truthy placeholder.
+        if (cookies.user) return { id: cookies.user };
+    } catch (e) { /* ignore */ }
+    return null;
+}
+
+const user = getUserFromCookies(Astro.request.headers.get('cookie'));
+
 // Fetch the product matching the route slug from Sanity
 const slug = Astro.params.slug;
 const results = await fetchProducts(`&& slug.current == "${slug}"`);
 const product = results && results[0] ? results[0] : null;
-const discount = product && product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : null;
+
+// Build gallery safely
+const gallery = (product && Array.isArray(product.images))
+    ? product.images.map(img => {
+            try {
+                if (!img) return '/placeholder.jpg';
+                if (typeof img === 'string') return img;
+                return urlFor(img).height(1200).auto('format').url();
+            } catch (e) {
+                return '/placeholder.jpg';
+            }
+        })
+    : [];
+
+const price = product && product.price != null ? Number(product.price) : null;
+const mrp = product && product.mrp != null ? Number(product.mrp) : null;
+const isCouple = product && Array.isArray(product.tags) && product.tags.some(t => (t.slug && t.slug.current === 'couple') || t === 'couple');
+const fmt = (n) => (n == null ? '' : `₹${Number(n).toLocaleString('en-IN')}`);
+const availableSizes = (product && Array.isArray(product.variants))
+    ? product.variants.filter(v => v.inStock && v.stock > 0).map(v => v.size)
+    : [];
+const tags = product && product.categories ? product.categories : [];
+const discountPercent = (mrp && price) ? Math.round(((mrp - price) / mrp) * 100) : 0;
+
+// Build a plain-text / HTML description renderer. Try to dynamically import @portabletext/react if available.
+let PortableTextComp = null;
+try {
+    // dynamic import; will fail if package not installed, we'll fall back
+    // Note: dynamic import works in frontmatter because it's top-level await context
+    const mod = await import('@portabletext/react');
+    PortableTextComp = mod.PortableText || mod.default || null;
+} catch (e) {
+    PortableTextComp = null;
+}
+
+function portableTextToPlain(pt) {
+    if (!pt) return '';
+    if (typeof pt === 'string') return pt;
+    try {
+        return pt.map(blk => (blk.children || []).map(c => c.text || '').join(' ')).filter(Boolean).join('\n\n');
+    } catch (e) { return ''; }
+}
+
+const plainDescription = portableTextToPlain(product && product.description ? product.description : '') || product?.excerpt || product?.title || '';
+
+// JSON-LD product schema
+const priceValue = price != null ? Number(price) : null;
+const availability = (product && Array.isArray(product.variants) && product.variants.some(v => v.inStock && v.stock > 0)) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+const sku = product?.sku || product?._id || product?.slug?.current || null;
+const productJsonLd = {
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    name: product?.title,
+    image: (product?.images || []).map(i => {
+        try { return urlFor(i).width(1200).auto('format').url(); } catch { return null; }
+    }).filter(Boolean),
+    description: plainDescription,
+    sku,
+    offers: priceValue ? {
+        '@type': 'Offer',
+        url: `https://www.mcutfactory.com/products/${product?.slug?.current || slug}`,
+        priceCurrency: 'INR',
+        price: String(priceValue),
+        availability,
+    } : undefined,
+};
 ---
 
 <BaseLayout>
-  <article class="grid grid-cols-1 lg:grid-cols-2 gap-12 bg-white p-8 rounded-xl shadow-2xl">
+    <article class="grid grid-cols-1 lg:grid-cols-2 gap-12 bg-white p-8 rounded-xl shadow-2xl">
     
     <div class="space-y-4">
-        <img src={product.images[0]} alt={product.title} class="w-full h-auto object-cover rounded-lg shadow-xl" />
-        <div class="flex space-x-2 overflow-x-auto">
-            {product.images.map(img => (
-                <img src={img} alt={`${product.title} view`} class="w-20 h-20 object-cover rounded-md cursor-pointer border-2 border-transparent hover:border-[rgb(var(--color-primary))] transition-colors" />
-            ))}
-        </div>
+                <!-- Gallery thumbnails + main image -->
+                {gallery.length > 0 ? (
+                    <>
+                        <img id="main-img" src={gallery[0]} alt={product?.title || 'Product image'} class="w-full h-auto object-contain rounded-lg shadow-xl" />
+                        <div class="flex space-x-2 overflow-x-auto mt-3">
+                            {gallery.map((img, i) => (
+                                <button type="button" data-full={img} data-index={i} class:list={["group relative rounded-md overflow-hidden", { 'ring-2 ring-black': i === 0 }]}>
+                                    <img src={img} alt={`${product?.title || 'thumb'} ${i + 1}`} class="w-20 h-20 object-cover" />
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    <img src="/placeholder.jpg" alt="placeholder" class="w-full h-auto object-contain rounded-lg shadow-xl" />
+                )}
     </div>
 
     <div>
-        <h1 class="text-4xl font-extrabold text-gray-900 mb-2">{product.title}</h1>
-        <p class="text-lg text-gray-500 mb-6 capitalize">{product.categorySlug.replace('-', ' ')}</p>
+                {product ? (
+                    <>
+                        <h1 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{product.title}</h1>
+                        <div class="mt-4 flex items-baseline gap-3">
+                            <span class="text-3xl font-bold text-black">{fmt(price)}</span>
+                            {mrp && mrp > price && (<span class="text-xl text-gray-500 line-through">{fmt(mrp)}</span>)}
+                        </div>
 
-        <div class="flex items-baseline mb-6 space-x-4">
-            <p class="text-5xl font-bold text-[rgb(var(--color-primary))]">
-                ${product.price.toFixed(2)}
-            </p>
-            {product.mrp && (
-                <p class="text-xl text-gray-400 line-through">
-                    ${product.mrp.toFixed(2)}
-                </p>
-            )}
-             {discount && (
-                <span class="px-3 py-1 bg-[rgb(var(--color-secondary))] text-white text-sm font-bold rounded-full shadow-md">
-                    Save {discount}%
-                </span>
-            )}
-        </div>
+                        <div class="mt-6">
+                            <div class="prose prose-sm mt-4 text-gray-600">
+                                {PortableTextComp ? (
+                                    <PortableTextComp value={product.description} />
+                                ) : (
+                                    <div set:html={plainDescription ? plainDescription.replace(/\n/g, '<br/>') : '<p>No description available.</p>'}></div>
+                                )}
+                            </div>
+                        </div>
 
-        <div class="prose max-w-none text-gray-600 mb-8">
-            <h2 class="text-2xl font-semibold mt-6 mb-3 text-gray-800">Product Description</h2>
-            <p>{product.description}</p>
-            </div>
-
-        <div class="flex items-center space-x-4">
-            <button
-                data-product-id={product._id}
-                data-product-title={product.title}
-                data-product-price={product.price}
-                data-product-image={product.images[0]}
-                class="add-to-cart-btn flex-grow py-3 px-6 border border-transparent text-lg font-medium rounded-lg shadow-lg text-white bg-[rgb(var(--color-primary))] hover:bg-purple-700 transition duration-300 transform hover:scale-[1.01]"
-            >
-                Add to Cart
-            </button>
-            <a href="/cart" class="py-3 px-6 border border-gray-300 text-lg font-medium rounded-lg shadow-md text-gray-700 bg-white hover:bg-gray-50 transition duration-300">
-                View Cart
-            </a>
-        </div>
+                        <div class="mt-6 flex gap-4">
+                            <button id="add-to-cart-btn" data-id={product._id} data-title={product.title} data-price={price ?? 0} data-slug={slug} data-image={(gallery[0]||'/placeholder.jpg')} class="flex flex-1 items-center justify-center rounded-md bg-black px-8 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-gray-800" aria-disabled={!(availableSizes.length>0)}>
+                                {availableSizes.length > 0 ? 'Add to Cart' : 'Out of Stock'}
+                            </button>
+                            <a href="/cart" class="py-3 px-6 border border-gray-300 text-lg font-medium rounded-lg shadow-md text-gray-700 bg-white hover:bg-gray-50 transition">View Cart</a>
+                        </div>
+                    </>
+                ) : (
+                    <div class="bg-white rounded-xl p-8 text-center text-slate-600">Product not found.</div>
+                )}
     </div>
   </article>
 
