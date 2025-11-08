@@ -1,129 +1,105 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import ProductCard from "../components/ProductCard.astro";
+import CategoryCard from "../components/CategoryCard.astro";
 import { fetchCategories, fetchProducts, urlFor } from "../lib/sanity";
 
+// Fetch top-level categories and featured products
 const categories = await fetchCategories();
-const productSamples: any = [];
+const allProducts: any[] = await fetchProducts();
 
-for (const cat of categories) {
-  const prods = await fetchProducts(`&& references("${cat._id}")`);
-  productSamples.push({ category: cat, samples: prods.slice(0, 6) });
-}
+// Map products into the shape expected by ProductCard component
+const featured = allProducts.slice(0, 12).map((p) => ({
+  _id: p._id,
+  title: p.title,
+  slug: p.slug.current || p.slug,
+  price: p.price,
+  mrp: p.mrp || null,
+  imageUrl: p.images && p.images[0] ? urlFor(p.images[0]).auto("format").width(800).url() : '/placeholder.png',
+  categorySlug:
+    (p.categories && p.categories.length && p.categories[0].slug && p.categories[0].slug.current) || 'misc',
+}));
+
+// Convert categories for CategoryCard
+const categoryCards = categories.map((c) => ({
+  _id: c._id,
+  title: c.title,
+  slug: c.slug.current || c.slug,
+  coverUrl: c.cover ? urlFor(c.cover).auto("format").width(1600).url() : '/category-placeholder.jpg',
+  description: c.description || '',
+}));
 ---
 
 <BaseLayout>
-  <section class="px-4 py-6 space-y-10">
-    <div class="bg-orange-300 p-12 rounded-lg">
-      <h1 class="text-white">Welcome</h1>
-    </div>
-    <section class="flex-1">
-      <div class="flex justify-between items-center mb-3">
-        <h2 class="text-lg font-extrabold ml-2">Categories</h2>
-        <a
-          href="/categories"
-          class="text-sm text-purple-500 mr-2 font-semibold hover:underline"
-          >See all →</a
-        >
-      </div>
-      <!-- Categories Section -->
-
-      <div class="grid grid-cols-3 lg:grid-cols-3 gap-4">
-        {
-          categories.map((cat) => (
-            <a
-              href={`/categories/${cat.slug.current}`}
-              class="group bg-white/5 dark:bg-white/10 p-2 rounded-xl flex flex-col items-center text-center hover:scale-[1.03] transition"
-            >
-              {cat.cover ? (
-                <img
-                  src={urlFor(cat.cover).auto("format").url()}
-                  alt={cat.title}
-                  class="w-500 h-30 lg:h-60 object-cover rounded-md mb-2"
-                />
-              ) : (
-                <div class="w-20 h-20 bg-linear-to-br from-slate-700 to-slate-900 rounded-md mb-2" />
-              )}
-              <div class="text-sm font-bold line-clamp-1">{cat.title}</div>
-            </a>
-          ))
-        }
-      </div>
-
-      <!-- Product Samples (Horizontal Scroll) -->
-      {
-        productSamples.map((ps) => (
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">{ps.category.title}</h2>
-              <a
-                href={`/categories/${ps.category.slug.current}`}
-                class="text-sm text-indigo-400 hover:underline"
-              >
-                View all →
-              </a>
-            </div>
-
-            <div class="flex gap-4 overflow-x-auto pb-3 scrollbar-hide snap-x snap-mandatory">
-              {ps.samples.map((p) => (
-                <div class="min-w-[150px] max-w-[150px] shrink-0 bg-white/5 dark:bg-white/10 rounded-xl p-2 snap-center hover:scale-[1.02] transition">
-                  <img
-                    src={urlFor(p.images[0]).auto("format").url()}
-                    alt={p.title}
-                    class="w-full h-24 object-cover rounded-md mb-2"
-                  />
-                  <div class="text-sm font-medium truncate">{p.title}</div>
-                  <div class="text-xs text-slate-400 mb-2">₹{p.price}</div>
-                  <button
-                    onClick={`addToCart(${JSON.stringify({ id: p._id, title: p.title, price: p.price })})`}
-                    class="w-full text-xs py-1 bg-indigo-600 hover:bg-indigo-700 rounded-md text-white"
-                  >
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
+  <main class="max-w-7xl mx-auto px-4 py-12 space-y-12">
+    <!-- Hero -->
+    <section class="relative bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl overflow-hidden shadow-xl">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center p-8 md:p-12">
+        <div class="text-white">
+          <h1 class="text-4xl md:text-5xl font-extrabold leading-tight mb-4">Discover great deals on everyday finds</h1>
+          <p class="text-lg opacity-90 mb-6">Curated products across categories — quality you can trust at prices you’ll love.</p>
+          <div class="flex gap-3">
+            <a href="/products" class="inline-block bg-white text-purple-700 font-semibold px-5 py-3 rounded-lg shadow hover:shadow-md">Shop Now</a>
+            <a href="/categories" class="inline-block border border-white/30 text-white px-5 py-3 rounded-lg hover:bg-white/10">Browse Categories</a>
           </div>
-        ))
-      }
+        </div>
+        <div class="hidden md:block">
+          <img src="/hero-illustration.png" alt="Hero illustration" class="w-full h-72 object-cover rounded-lg shadow-lg" />
+        </div>
+      </div>
     </section>
 
-    <script>
-      window.addToCart = function (item) {
-        const cart = JSON.parse(sessionStorage.getItem("cart") || "[]");
-        const found = cart.find((i) => i.id === item.id);
-        if (found) {
-          found.qty += 1;
-        } else {
-          cart.push({ ...item, qty: 1 });
-        }
-        sessionStorage.setItem("cart", JSON.stringify(cart));
-        showToast("Added to cart");
-        window.dispatchEvent(new Event("storage"));
-      };
+    <!-- Promo strip -->
+    <section class="bg-white rounded-lg shadow-sm p-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center justify-center w-12 h-12 bg-[rgba(79,70,229,0.1)] rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-600" viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h3.5a1 1 0 010 2H4v10h12V5h-3.5a1 1 0 110-2H16a2 2 0 012 2v11a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg>
+        </div>
+        <div>
+          <p class="font-semibold">Free shipping over ₹999</p>
+          <p class="text-sm text-slate-500">Fast delivery across India — returns within 7 days.</p>
+        </div>
+      </div>
+      <a href="/checkout" class="text-sm text-purple-600 font-semibold hover:underline">Checkout offers →</a>
+    </section>
 
-      function showToast(text) {
-        let el = document.getElementById("toast");
-        if (!el) {
-          el = document.createElement("div");
-          el.id = "toast";
-          el.className =
-            "fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-4 py-2 rounded-lg shadow-md text-sm z-50";
-          document.body.appendChild(el);
-        }
-        el.textContent = text;
-        clearTimeout(el._timeout);
-        el._timeout = setTimeout(() => el.remove(), 2200);
-      }
-    </script>
+    <!-- Categories Grid -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Shop by category</h2>
+        <a href="/categories" class="text-sm text-indigo-600 hover:underline">See all</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {categoryCards.map((cat) => (
+          <CategoryCard category={cat} />
+        ))}
+      </div>
+    </section>
 
-    <style>
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-    </style>
-  </section>
+    <!-- Featured Products -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Featured products</h2>
+        <a href="/products" class="text-sm text-indigo-600 hover:underline">View all</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {featured.map((p) => (
+          <ProductCard product={p} />
+        ))}
+      </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-lg p-6 md:p-10">
+      <div class="max-w-3xl mx-auto text-center">
+        <h3 class="text-2xl font-bold mb-2">Join our newsletter</h3>
+        <p class="opacity-90 mb-4">Get exclusive discounts, new arrivals, and product picks — directly in your inbox.</p>
+        <form class="flex flex-col sm:flex-row gap-3 justify-center">
+          <input type="email" placeholder="Your email" class="w-full sm:w-auto min-w-[320px] px-4 py-3 rounded-md text-slate-800" />
+          <button class="px-6 py-3 bg-indigo-600 rounded-md font-semibold hover:bg-indigo-700">Subscribe</button>
+        </form>
+      </div>
+    </section>
+  </main>
 </BaseLayout>
+

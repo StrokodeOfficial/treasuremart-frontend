@@ -41,7 +41,7 @@ import { Icon } from "astro-icon/components";
         </svg>
         <span class="sr-only">Search</span>
       </button>
-      <div class="relative hidden md:block">
+  <div class="relative hidden md:block">
         <div
           class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none"
         >
@@ -63,10 +63,12 @@ import { Icon } from "astro-icon/components";
         </div>
         <input
           type="text"
-          id="search-navbar"
-          class="block w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          placeholder="Search..."
+          id="search-navbar-desktop"
+          class="search-input block w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          placeholder="Search products..."
+          autocomplete="off"
         />
+        <div id="search-results" class="hidden absolute z-50 mt-1 w-full bg-white rounded-md shadow-lg max-h-80 overflow-auto"></div>
       </div>
       <button
         data-collapse-toggle="navbar-search"
@@ -117,9 +119,10 @@ import { Icon } from "astro-icon/components";
         </div>
         <input
           type="text"
-          id="search-navbar"
-          class="block w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          placeholder="Search..."
+          id="search-navbar-mobile"
+          class="search-input block w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          placeholder="Search products..."
+          autocomplete="off"
         />
       </div>
       <ul
@@ -148,5 +151,79 @@ import { Icon } from "astro-icon/components";
         </li>
       </ul>
     </div>
+      <div class="ml-4 flex items-center">
+        <a href="/cart" class="relative inline-flex items-center px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-900 dark:text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4"/></svg>
+          <span id="nav-cart-count" class="ml-2 text-sm font-semibold text-gray-900 dark:text-white">0</span>
+        </a>
+      </div>
   </div>
 </nav>
+
+<script is:inline>
+  // Update cart count from session-only storage and listen to 'cartUpdated' events
+  function updateCartCount() {
+    try {
+      const cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+      const countEl = document.getElementById('nav-cart-count');
+      if (countEl) {
+        const total = cart.reduce((s, i) => s + (i.quantity || 0), 0);
+        countEl.textContent = total.toString();
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Initial update and event listener
+  document.addEventListener('astro:page-load', () => {
+    updateCartCount();
+    window.addEventListener('cartUpdated', updateCartCount);
+  });
+
+  // Live search: debounce and fetch /api/search?q=
+  function debounce(fn, wait) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+  }
+
+  async function doSearch(q, container) {
+    if (!q || q.trim().length < 1) {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`);
+      const data = await res.json();
+      const items = data.results || [];
+      if (items.length === 0) {
+        container.innerHTML = `<div class="p-3 text-sm text-gray-500">No results</div>`;
+        container.classList.remove('hidden');
+        return;
+      }
+      container.innerHTML = items.map(it => `
+        <a href="/products/${it.slug}" class="block px-3 py-2 hover:bg-gray-50 border-b last:border-b-0">
+          <div class="text-sm font-medium text-gray-900">${it.title}</div>
+        </a>
+      `).join('');
+      container.classList.remove('hidden');
+    } catch (e) {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+    }
+  }
+
+  document.addEventListener('astro:page-load', () => {
+    const desktopInput = document.getElementById('search-navbar-desktop');
+    const mobileInput = document.getElementById('search-navbar-mobile');
+    const container = document.getElementById('search-results');
+    const handler = debounce((ev) => doSearch(ev.target.value, container), 250);
+    if (desktopInput) desktopInput.addEventListener('input', handler);
+    if (mobileInput) mobileInput.addEventListener('input', handler);
+    document.addEventListener('click', (e) => {
+      if (!container) return;
+      if (!container.contains(e.target) && e.target !== desktopInput) container.classList.add('hidden');
+    });
+  });
+</script>

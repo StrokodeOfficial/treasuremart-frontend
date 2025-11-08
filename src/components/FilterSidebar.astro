@@ -1,0 +1,63 @@
+---
+export interface Props {
+  allCategories: any[];
+  catParam: string | null;
+  minPrice: number;
+  maxPrice: number;
+  minVal: number;
+  maxVal: number;
+  instockOnly: boolean;
+  sort: string;
+  hrefWith: (p: Record<string, string | null | undefined>) => string;
+}
+
+const { allCategories = [], catParam, minPrice = 0, maxPrice = 1000, minVal, maxVal, instockOnly, sort, hrefWith } = Astro.props as Props;
+---
+
+<aside class="lg:col-span-1 p-4 bg-white rounded-xl shadow h-fit sticky top-20">
+  <h2 class="text-2xl font-semibold text-gray-800 mb-4">Filters</h2>
+
+  <div class="mb-4">
+    <h3 class="font-medium text-gray-700 mb-2">Category</h3>
+    <ul class="space-y-1 text-sm">
+      <li>
+        <a href={hrefWith({ cat: null })} class={`block px-3 py-2 rounded-md ${!catParam ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-50'}`}>All Products</a>
+      </li>
+      {allCategories.map((c: any) => (
+        <li>
+          <a href={hrefWith({ cat: c.slug })} class={`block px-3 py-2 rounded-md ${catParam === c.slug ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-50'}`}>{c.title}</a>
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <div class="mb-4">
+    <h3 class="font-medium text-gray-700 mb-2">Price</h3>
+    <div class="flex gap-2">
+      <a href={hrefWith({ min: String(minPrice), max: String(maxVal) })} class="text-sm px-3 py-2 rounded-md border hover:bg-gray-50">Min: {minPrice}</a>
+      <a href={hrefWith({ min: String(minVal), max: String(maxPrice) })} class="text-sm px-3 py-2 rounded-md border hover:bg-gray-50">Max: {maxPrice}</a>
+    </div>
+    <form class="mt-3 grid grid-cols-2 gap-2" method="GET" action="/products">
+      <input type="hidden" name="cat" value={catParam || ''} />
+      <input name="min" type="number" value={minVal} placeholder={String(minPrice)} class="px-3 py-2 border rounded-md text-sm" />
+      <input name="max" type="number" value={maxVal} placeholder={String(maxPrice)} class="px-3 py-2 border rounded-md text-sm" />
+      <button class="col-span-full mt-2 w-full px-3 py-2 bg-black text-white rounded-md text-sm">Apply</button>
+    </form>
+  </div>
+
+  <div class="mb-4">
+    <h3 class="font-medium text-gray-700 mb-2">Options</h3>
+    <div class="flex items-center gap-2">
+      <a href={hrefWith({ instock: instockOnly ? null : '1' })} class={`px-3 py-2 rounded-md text-sm ${instockOnly ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-50'}`}>In stock only</a>
+    </div>
+  </div>
+
+  <div>
+    <h3 class="font-medium text-gray-700 mb-2">Sort</h3>
+    <div class="flex flex-col gap-2">
+      <a href={hrefWith({ sort: 'newest' })} class={`px-3 py-2 rounded-md text-sm ${sort === 'newest' ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-50'}`}>Newest</a>
+      <a href={hrefWith({ sort: 'price-asc' })} class={`px-3 py-2 rounded-md text-sm ${sort === 'price-asc' ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-50'}`}>Price: Low to High</a>
+      <a href={hrefWith({ sort: 'price-desc' })} class={`px-3 py-2 rounded-md text-sm ${sort === 'price-desc' ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-50'}`}>Price: High to Low</a>
+    </div>
+  </div>
+</aside>

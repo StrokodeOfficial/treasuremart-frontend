@@ -1,19 +1,199 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { fetchCategories } from '../../lib/sanity';
-const categories = await fetchCategories();
+import CategoryCard from '../../components/CategoryCard.astro';
+import { fetchCategories, urlFor } from '../../lib/sanity';
+import client from '../../lib/sanity';
+
+// Load top-level (parent) categories and all categories including children
+const parentsRaw = await fetchCategories();
+let parents = parentsRaw.map((c) => ({
+  _id: c._id,
+  title: c.title,
+  slug: c.slug && c.slug.current ? c.slug.current : c.slug,
+  coverUrl: c.cover ? urlFor(c.cover).auto('format').width(1200).url() : '/category-placeholder.jpg',
+  description: c.description || '',
+}));
+
+const allRaw = await client.fetch(`*[_type == "category"]{_id,title,slug,description,cover,parent->{_id,title,slug}}`);
+const allCategories = allRaw.map((c) => ({
+  _id: c._id,
+  title: c.title,
+  slug: c.slug && c.slug.current ? c.slug.current : c.slug,
+  description: c.description || '',
+  coverUrl: c.cover ? urlFor(c.cover).auto('format').width(1200).url() : '/category-placeholder.jpg',
+  parentId: c.parent ? c.parent._id : null,
+}));
+
+// Build children map for quick lookup
+const childrenByParent = {};
+for (const cat of allCategories) {
+  if (cat.parentId) {
+    childrenByParent[cat.parentId] = childrenByParent[cat.parentId] || [];
+    childrenByParent[cat.parentId].push(cat);
+  }
+}
 ---
 <BaseLayout>
-  <div class="card">
-    <h2 class="text-xl font-semibold mb-4">Categories</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {categories.map(c => (
-        <a class="block p-4 rounded-xl bg-white/3 hover:scale-[1.01] transition" href={`/categories/${c.slug.current}`}>
-          {c.cover ? <img class="w-full h-44 object-cover rounded-md mb-3" src={c.cover.asset.url} alt={c.title}/> : null}
-          <div class="font-semibold">{c.title}</div>
-          <div class="text-xs text-slate-400">{c.description}</div>
-        </a>
-      ))}
+  <div class="max-w-7xl mx-auto px-4 py-12">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <!-- Left: Parent categories list (collapsible on mobile) -->
+      <aside class="lg:col-span-1">
+        <div class="bg-white rounded-xl shadow p-4">
+          <h3 class="font-bold text-lg mb-3">Categories</h3>
+
+          <!-- Mobile: filters toggle and select dropdown (hidden by default) -->
+          <div class="block lg:hidden mb-3">
+            <button id="filters-toggle" aria-expanded="false" class="w-full bg-slate-100 text-slate-700 px-3 py-2 rounded-md flex items-center justify-between">
+              <span>Filters</span>
+              <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div id="mobile-filters-panel" class="mt-3 hidden">
+              <label for="parent-select" class="sr-only">Select category</label>
+              <select id="parent-select" class="w-full border rounded-md px-3 py-2">
+                {parents.map(p => (
+                  <option value={p._id}>{p.title}</option>
+                ))}
+              </select>
+
+              <!-- Optional: a compact parent list for quicker taps on mobile -->
+              <ul id="parent-list-mobile" class="mt-3 space-y-1">
+                {parents.map((p, idx) => (
+                  <li>
+                    <button data-id={p._id} class="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 parent-item-mobile">
+                      <span class="font-medium">{p.title}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <!-- Desktop: list with expandable children -->
+          <ul id="parent-list" class="hidden lg:block space-y-1">
+            {parents.map((p, idx) => (
+              <li>
+                <button data-id={p._id} class="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 flex items-center justify-between parent-item" aria-expanded={idx === 0 ? 'true' : 'false'}>
+                  <span class="font-medium">{p.title}</span>
+                  <span class="text-sm text-slate-400">{childrenByParent[p._id] ? childrenByParent[p._id].length : 0}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Right: selected parent header + children grid -->
+      <section class="lg:col-span-3">
+        <div id="parent-details">
+          {parents.length === 0 ? (
+            <div class="bg-white rounded-xl p-8 text-center text-slate-600">No categories found.</div>
+          ) : (
+            parents.map((p, idx) => (
+              <div data-parent-id={p._id} class={idx === 0 ? 'parent-panel' : 'parent-panel hidden'}>
+                <div class="bg-white rounded-xl shadow overflow-hidden mb-6">
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center p-6">
+                    <div class="md:col-span-2">
+                      <h2 class="text-3xl font-extrabold mb-2">{p.title}</h2>
+                      <p class="text-slate-600">{p.description}</p>
+                    </div>
+                    <div class="hidden md:block">
+                      <img src={p.coverUrl} alt={p.title} class="w-full h-40 object-cover rounded-md" />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 class="text-xl font-semibold mb-4">Subcategories</h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(childrenByParent[p._id] || []).map(child => (
+                      <a href={`/categories/${child.slug}`} class="block">
+                        <CategoryCard category={child} />
+                      </a>
+                    ))}
+                    {(!childrenByParent[p._id] || childrenByParent[p._id].length === 0) && (
+                      <div class="text-slate-500 col-span-full">No subcategories for this category.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   </div>
+
+  <script is:inline>
+    (function initCategoryPanel() {
+      const run = () => {
+        const parents = Array.from(document.querySelectorAll('.parent-item'));
+        const parentsMobile = Array.from(document.querySelectorAll('.parent-item-mobile'));
+        const panels = Array.from(document.querySelectorAll('.parent-panel'));
+        const select = document.getElementById('parent-select');
+        const filtersToggle = document.getElementById('filters-toggle');
+        const mobileFiltersPanel = document.getElementById('mobile-filters-panel');
+
+        function setActive(parentId) {
+          panels.forEach(panel => {
+            if (panel.dataset.parentId === parentId) panel.classList.remove('hidden');
+            else panel.classList.add('hidden');
+          });
+
+          parents.forEach(btn => {
+            if (btn.dataset.id === parentId) btn.classList.add('bg-gray-50');
+            else btn.classList.remove('bg-gray-50');
+          });
+
+          // mobile buttons
+          parentsMobile.forEach(btn => {
+            if (btn.dataset.id === parentId) btn.classList.add('bg-gray-50');
+            else btn.classList.remove('bg-gray-50');
+          });
+
+          if (select) select.value = parentId;
+
+          // If on mobile, close filters panel after selection for better UX
+          if (mobileFiltersPanel && window.getComputedStyle(mobileFiltersPanel).display !== 'none') {
+            mobileFiltersPanel.classList.add('hidden');
+            if (filtersToggle) filtersToggle.setAttribute('aria-expanded', 'false');
+          }
+        }
+
+        // Initial active parent (first one)
+        if (parents.length > 0) setActive(parents[0].dataset.id);
+
+        parents.forEach(btn => {
+          btn.addEventListener('click', () => setActive(btn.dataset.id));
+        });
+
+        parentsMobile.forEach(btn => {
+          btn.addEventListener('click', () => setActive(btn.dataset.id));
+        });
+
+        if (select) {
+          select.addEventListener('change', (e) => setActive(e.target.value));
+        }
+
+        if (filtersToggle && mobileFiltersPanel) {
+          filtersToggle.addEventListener('click', () => {
+            const isHidden = mobileFiltersPanel.classList.contains('hidden');
+            if (isHidden) {
+              mobileFiltersPanel.classList.remove('hidden');
+              filtersToggle.setAttribute('aria-expanded', 'true');
+            } else {
+              mobileFiltersPanel.classList.add('hidden');
+              filtersToggle.setAttribute('aria-expanded', 'false');
+            }
+          });
+        }
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+      } else {
+        run();
+      }
+    })();
+  </script>
 </BaseLayout>

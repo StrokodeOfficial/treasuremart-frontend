@@ -15,7 +15,7 @@ export interface Props {
 }
 
 const { product } = Astro.props;
-const discount = product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : null;
+const discount = product && product.mrp ? Math.round(((Number(product.mrp) - Number(product.price || 0)) / Number(product.mrp)) * 100) : null;
 ---
 
 <article class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden group border border-gray-100">
@@ -35,7 +35,7 @@ const discount = product.mrp ? Math.round(((product.mrp - product.price) / produ
         )}
     </a>
     <div class="p-4">
-        <p class="text-sm text-gray-500 mb-1 capitalize">{product.categorySlug.replace('-', ' ')}</p>
+    <p class="text-sm text-gray-500 mb-1 capitalize">{(product.categorySlug || '').replace('-', ' ')}</p>
         <h3 class="text-lg font-semibold text-gray-800 line-clamp-2">
             <a href={`/products/${product.slug}`} class="hover:text-[rgb(var(--color-primary))] transition-colors">
                 {product.title}
@@ -45,11 +45,11 @@ const discount = product.mrp ? Math.round(((product.mrp - product.price) / produ
         <div class="flex items-end justify-between mt-3">
             <div class="flex flex-col">
                 <p class="text-2xl font-bold text-[rgb(var(--color-primary))]">
-                    ${product.price.toFixed(2)}
+                    ${Number(product.price || 0).toFixed(2)}
                 </p>
                 {product.mrp && (
                     <p class="text-sm text-gray-400 line-through">
-                        ${product.mrp.toFixed(2)}
+                        ${Number(product.mrp).toFixed(2)}
                     </p>
                 )}
             </div>

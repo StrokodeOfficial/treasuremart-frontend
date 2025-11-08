@@ -1,20 +1,15 @@
 ---
+export const prerender = false;
+
 import BaseLayout from '@layouts/BaseLayout.astro';
 import ProductCard from '@components/ProductCard.astro';
-// --- PLACEHOLDER DATA (Replace with your Sanity data fetching logic) ---
-export const getStaticPaths = () => {
-    // In a real app, this would query Sanity for all product slugs
-    const products = [
-        { _id: 'p1', title: 'Wireless Headphones', slug: 'wireless-headphones', price: 99.99, mrp: 149.99, imageUrl: 'https://picsum.photos/id/250/600/800', categorySlug: 'electronics', description: 'Experience crystal-clear sound and supreme comfort with these over-ear wireless headphones. Featuring long-lasting battery life and noise cancellation.', images: ['https://picsum.photos/id/250/600/800', 'https://picsum.photos/id/250/600/801', 'https://picsum.photos/id/250/600/802'] },
-    ];
-    return products.map(product => ({
-        params: { slug: product.slug },
-        props: { product },
-    }));
-};
+import { fetchProducts, urlFor } from '../../lib/sanity';
 
-const { product } = Astro.props;
-const discount = product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : null;
+// Fetch the product matching the route slug from Sanity
+const slug = Astro.params.slug;
+const results = await fetchProducts(`&& slug.current == "${slug}"`);
+const product = results && results[0] ? results[0] : null;
+const discount = product && product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : null;
 ---
 
 <BaseLayout>

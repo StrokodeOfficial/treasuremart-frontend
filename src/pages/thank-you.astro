@@ -1,4 +1,23 @@
-<section class="p-12 m-12 bg-lime-200 rounded-lg text-center text-3xl max-h-screen">
-    <p>Work in Progress</p>
-    <p>Go back to <a href="/" class="text-blue-500 underline">home</a></p>
-</section>
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout>
+    <main class="max-w-3xl mx-auto py-20 px-6 text-center">
+        <div class="bg-white rounded-2xl p-10 shadow-xl">
+            <h1 class="text-3xl font-extrabold mb-4">Thank you — your order is placed!</h1>
+            <p class="text-slate-600 mb-6">We received your order and will contact you shortly with confirmation. For now this is a demo flow — no payment was taken.</p>
+            <a href="/" class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700">Continue shopping</a>
+        </div>
+    </main>
+
+    <script is:inline>
+        // Clear session-only cart on thank-you page load
+        try {
+            sessionStorage.removeItem('cart');
+            window.dispatchEvent(new Event('cartUpdated'));
+        } catch (e) {
+            console.warn('Could not clear cart:', e);
+        }
+    </script>
+</BaseLayout>
